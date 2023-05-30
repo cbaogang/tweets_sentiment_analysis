@@ -5,20 +5,21 @@ from pyspark.ml.classification import LogisticRegression, RandomForestClassifier
 from pyspark.ml.feature import HashingTF, Tokenizer
 from pyspark.sql.functions import expr
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.functions import rand
 
 # Create a SparkSession
-spark = SparkSession.builder.appName("ClassificationExample").config("spark.driver.memory", "4g").config("spark.executor.memory", "4g").getOrCreate()
+spark = SparkSession.builder.appName("ClassificationExample").config("spark.driver.memory", "4g").config("spark.executor.memory", "4g").config("spark.eventLog.enabled", "true").getOrCreate()
 
-# Prepare training documents from a list of (id, text, label) tuples.
-# Read the training data from a CSV file
-training = spark.read.csv("/covid_twitter/train_tweet.csv", header=True, inferSchema=True)
 
-# Read the test data from a CSV file
-test = spark.read.csv("/covid_twitter/test_tweet.csv", header=True, inferSchema=True)
+
+# Read the data from a CSV file
+data = spark.read.csv("/covid_twitter/tweet_data.csv", header=True, inferSchema=True)
 
 # Filter out rows with "Neutral" sentiment
-training = training.filter(training["Sentiment"] != "Neutral")
-test = test.filter(test["Sentiment"] != "Neutral")
+data = data.filter(data["Sentiment"] != "Neutral")
+
+# Split the data into train and test using a 0.2 ratio
+training, test = data.randomSplit([0.8, 0.2], seed=42)
 
 # Define the mapping of sentiment labels to numerical values
 sentiment_mapping = {

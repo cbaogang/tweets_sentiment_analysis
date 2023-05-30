@@ -1,5 +1,5 @@
--- Load the train dataset from HDFS
-train_data = LOAD '/covid_twitter/train_tweet.csv' USING PigStorage(',') AS (
+-- Load the tweet data from HDFS
+tweet_data = LOAD '/covid_twitter/tweet_data.csv' USING PigStorage(',') AS (
     UserName: int,
     ScreenName: int,
     Location: chararray,
@@ -8,65 +8,21 @@ train_data = LOAD '/covid_twitter/train_tweet.csv' USING PigStorage(',') AS (
     Sentiment: chararray
 );
 
-DESCRIBE train_data;
+-- Tokenize the OriginalTweet field to extract individual words
+tokenized_data = FOREACH tweet_data GENERATE FLATTEN(TOKENIZE(OriginalTweet)) AS word;
 
--- Tokenize the train tweets to extract individual words
-train_words = FOREACH train_data GENERATE FLATTEN(TOKENIZE(OriginalTweet)) AS word;
+-- Group the words and calculate the counts
+grouped_words = GROUP tokenized_data BY word;
+word_counts = FOREACH grouped_words GENERATE group AS word, COUNT(tokenized_data) AS count;
 
--- Filter out common stop words (if necessary)
-stop_words = LOAD '/covid_twitter/stopwords.txt' USING TextLoader AS (stop: chararray);
+-- Sort the word counts in descending order
+sorted_word_counts = ORDER word_counts BY count DESC;
 
--- Remove any stop words using a Left Outer Join for train tweets
-train_words = JOIN train_words BY word LEFT OUTER, stop_words BY stop;
-train_words = FILTER train_words BY stop_words::stop IS NULL;
+-- Get the top 20 most frequent words
+top_20_words = LIMIT sorted_word_counts 20;
 
--- Group the train data by word and calculate the counts
-grouped_train_words = GROUP train_words BY word;
-train_word_counts = FOREACH grouped_train_words GENERATE group AS word, COUNT(train_words) AS count;
+-- Print the result for top 20 words
+DUMP top_20_words;
 
--- Sort the train word counts in descending order
-sorted_train_word_counts = ORDER train_word_counts BY count DESC;
-
--- Get the top 20 most frequent words in train tweets
-top_20_train_words = LIMIT sorted_train_word_counts 20;
-
--- Print the result for train tweets
-DUMP top_20_train_words;
-
--- Store the top 20 train words into a file
-STORE top_20_train_words INTO '/pig/top_20_train_words.csv' USING PigStorage(',');
-
--- Load the test dataset from HDFS
-test_data = LOAD '/covid_twitter/test_tweet.csv' USING PigStorage(',') AS (
-    UserName: int,
-    ScreenName: int,
-    Location: chararray,
-    TweetAt: chararray,
-    OriginalTweet: chararray,
-    Sentiment: chararray
-);
-
-DESCRIBE test_data;
-
--- Tokenize the test tweets to extract individual words
-test_words = FOREACH test_data GENERATE FLATTEN(TOKENIZE(OriginalTweet)) AS word;
-
--- Remove any stop words using a Left Outer Join for test tweets
-test_words = JOIN test_words BY word LEFT OUTER, stop_words BY stop;
-test_words = FILTER test_words BY stop_words::stop IS NULL;
-
--- Group the test data by word and calculate the counts
-grouped_test_words = GROUP test_words BY word;
-test_word_counts = FOREACH grouped_test_words GENERATE group AS word, COUNT(test_words) AS count;
-
--- Sort the test word counts in descending order
-sorted_test_word_counts = ORDER test_word_counts BY count DESC;
-
--- Get the top 20 most frequent words in test tweets
-top_20_test_words = LIMIT sorted_test_word_counts 20;
-
--- Print the result for test tweets
-DUMP top_20_test_words;
-
--- Store the top 20 test words into a file
-STORE top_20_test_words INTO '/pig/top_20_test_words.csv' USING PigStorage(',');
+-- Store the top 20 words into a file
+-- STORE top_20_words INTO '/pig/top_words.csv' USING PigStorage(',');
